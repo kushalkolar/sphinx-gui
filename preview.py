@@ -1,8 +1,9 @@
-from PySide import QtGui, QtCore, QtWebKit
+from PyQt5 import QtGui, QtCore
+from PyQt5 import QtWebEngineWidgets
 from unipath import Path
 
 
-class Preview(QtWebKit.QWebView):
+class Preview(QtWebEngineWidgets.QWebEngineView):
 	def __init__(self, parent=None):
 		super(Preview, self).__init__(parent)
 		
@@ -14,7 +15,7 @@ class Preview(QtWebKit.QWebView):
 		
 		
 		
-class PDFPane(QtWebKit.QWebView):
+class PDFPane(QtWebEngineWidgets.QWebEngineView):
 	def __init__(self, parent=None):
 		super(PDFPane, self).__init__(parent)
 		self.path = None

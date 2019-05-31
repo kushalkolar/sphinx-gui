@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 import sys
 
-from PySide import QtGui
+from PyQt5 import QtWidgets
 
 from window import MainWindow
 
 if __name__ == '__main__':
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
     window.setup_app()
+    window.show()
     sys.exit(app.exec_())

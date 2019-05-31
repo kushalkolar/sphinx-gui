@@ -2,16 +2,18 @@ import os
 import subprocess
 import sys
 
-from PySide import QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore
 from unipath import Path
 
 from dialogs import OpenDialog
-from editor import Editor
+from editor import Editor, Highlighter
 from preview import Preview, PDFPane
 from tree import Tree
 
+import traceback
+import json
 
-class MainWindow(QtGui.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         # super(MainWindow, self).__init__(parent)
         if sys.platform == 'darwin':
@@ -24,14 +26,16 @@ class MainWindow(QtGui.QMainWindow):
             )
         else:
             super(MainWindow, self).__init__(parent)
-
+        
     def setup_app(self):
         self.setupActions()
-        splitter = QtGui.QSplitter(QtCore.Qt.Horizontal)
+        splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         self.tree = Tree()
         self.editor = Editor()
+        self.highlighter = Highlighter(self.editor.document(), 'rst')
+        
 
-        self.tab_widget = QtGui.QTabWidget()
+        self.tab_widget = QtWidgets.QTabWidget()
         self.preview = Preview()
         self.pdf_pane = PDFPane()
         self.tab_widget.addTab(self.preview, "HTML")
@@ -45,11 +49,21 @@ class MainWindow(QtGui.QMainWindow):
         splitter.addWidget(self.editor)
 
         splitter.addWidget(self.tab_widget)
+        
+        splitter.setSizes([300, 950, 1350])
 
         self.setWindowTitle("Sphinx Docs Editor")
         self.createMenus()
         self.createToolBars()
-        self.showMaximized()
+        self.resize(300 + 950 + 1350, 1400)
+        
+        try:
+            with open('./config.json', 'r') as f:
+                c = json.load(f)
+            path = c['last_folder']
+            self.openFolder(path)
+        except:
+            pass
 
     def setupActions(self):
         """
@@ -57,8 +71,8 @@ class MainWindow(QtGui.QMainWindow):
         """
 
         # File Menu --------------------------------------------------
-        self.openAction = QtGui.QAction(
-            # QtGui.QIcon(":/images/open.png"),
+        self.openAction = QtWidgets.QAction(
+            # QtWidgets.QIcon(":/images/open.png"),
             "&Open File",
             self,
             shortcut="Ctrl+O",
@@ -66,8 +80,8 @@ class MainWindow(QtGui.QMainWindow):
             triggered=self.openFile
         )
 
-        self.openFolderAction = QtGui.QAction(
-            # QtGui.QIcon(":/images/open.png"),
+        self.openFolderAction = QtWidgets.QAction(
+            # QtWidgets.QIcon(":/images/open.png"),
             "Open Folder",
             self,
             shortcut="Ctrl+Shift+O",
@@ -75,8 +89,8 @@ class MainWindow(QtGui.QMainWindow):
             triggered=self.openFolder
         )
 
-        self.saveAction = QtGui.QAction(
-            # QtGui.QIcon(":/images/save.png"),
+        self.saveAction = QtWidgets.QAction(
+            # QtWidgets.QIcon(":/images/save.png"),
             "&Save File",
             self,
             shortcut="Ctrl+S",
@@ -84,8 +98,8 @@ class MainWindow(QtGui.QMainWindow):
             triggered=self.saveFile
         )
 
-        self.saveAsAction = QtGui.QAction(
-            # QtGui.QIcon(":/images/save.png"),
+        self.saveAsAction = QtWidgets.QAction(
+            # QtWidgets.QIcon(":/images/save.png"),
             "Save As File",
             self,
             shortcut="Ctrl+Shift+S",
@@ -93,8 +107,8 @@ class MainWindow(QtGui.QMainWindow):
             triggered=self.saveFileAs
         )
 
-        self.quitAction = QtGui.QAction(
-            # QtGui.QIcon(':/images/save.png'),
+        self.quitAction = QtWidgets.QAction(
+            # QtWidgets.QIcon(':/images/save.png'),
             "&Quit",
             self,
             shortcut="Ctrl+Q",
@@ -104,7 +118,7 @@ class MainWindow(QtGui.QMainWindow):
 
         # Build Menu --------------------------------------------------
 
-        self.buildHTMLAction = QtGui.QAction(
+        self.buildHTMLAction = QtWidgets.QAction(
             "Build &HTML",
             self,
             shortcut="Ctrl+B",
@@ -112,12 +126,15 @@ class MainWindow(QtGui.QMainWindow):
             triggered=self.buildHTML
         )
 
-        self.buildPDFAction = QtGui.QAction(
+        self.buildPDFAction = QtWidgets.QAction(
             "Build &PDF",
             self,
             shortcut="Ctrl+Shift+B",
             statusTip="Build PDF",
             triggered=self.buildPDF
+        )
+        self.selectFontAction = QtWidgets.QAction(
+            "Select Font", self, triggered=self.openFontDialog
         )
 
     def createMenus(self):
@@ -138,11 +155,13 @@ class MainWindow(QtGui.QMainWindow):
         self.fileToolBar.addAction(self.openAction)
         self.fileToolBar.addAction(self.openFolderAction)
         self.fileToolBar.addAction(self.saveAction)
+        self.fileToolBar.addAction(self.selectFontAction)
         # self.fileToolBar.addAction(self.saveAsAction)
         # self.fileToolBar.addAction(self.quitAction)
         self.buildToolBar = self.addToolBar("Build")
         self.buildToolBar.addAction(self.buildHTMLAction)
         self.buildToolBar.addAction(self.buildPDFAction)
+        
 
     def openFile(self, path=None):
         """
@@ -169,18 +188,18 @@ class MainWindow(QtGui.QMainWindow):
         if self.file_path:
             text = self.editor.toPlainText()
             try:
-                f = open(self.file_path.absolute(), "wb")
+                f = open(self.tree.get_current_item_path(), "w")
                 f.write(text)
                 f.close()
-                # self.rebuildHTML()
+                self.buildHTML()
             except IOError:
-                QtGui.QMessageBox.information(
+                QtWidgets.QMessageBox.information(
                     self,
                     "Unable to open file: %s" % self.file_path.absolute()
                 )
 
     def saveFileAs(self):
-        filename, _ = QtGui.QFileDialog.getSaveFileName(
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             self,
             'Save File As',
             '',
@@ -189,12 +208,12 @@ class MainWindow(QtGui.QMainWindow):
         if filename:
             text = self.editor.toPlainText()
             try:
-                f = open(filename, "wb")
+                f = open(filename, "w")
                 f.write(text)
                 f.close()
-                # self.rebuildHTML()
+                self.buildHTML()
             except IOError:
-                QtGui.QMessageBox.information(
+                QtWidgets.QMessageBox.information(
                     self,
                     "Unable to open file: %s" % filename
                 )
@@ -211,7 +230,25 @@ class MainWindow(QtGui.QMainWindow):
             path = dialog.getExistingDirectory(self, "Open Folder", '')
 
         if path:
-            self.handleFileChanged(path)
+            self.handleFileChanged(path)#, filename='index.rst')
+            with open('./config.json', 'r') as f:
+                c = json.load(f)
+            c['last_folder'] = path
+            with open('./config.json', 'w') as f:
+                json.dump(c, f)
+    
+    def openFontDialog(self):
+        font = QtWidgets.QFontDialog.getFont(self.editor.font())
+        if font[1]:
+            font = font[0]
+            font.setFixedPitch(True)
+            self.editor.setFont(font)
+            with open('./config.json', 'r') as f:
+                c = json.load(f)
+            c['font_family'] = font.family()
+            c['font_size'] = font.pointSize()
+            with open('./config.json', 'w') as f:
+                json.dump(c, f)
 
     def handleFileChanged(self, dir, filename=None):
         """
@@ -221,18 +258,34 @@ class MainWindow(QtGui.QMainWindow):
         if not filename:
             # TODO: find first rst file if index.rst doesn't exist.
             filename = "index.rst"
-
         self.file_path = Path(dir, filename)
         file_stem = str(self.file_path.stem)
-        html_str = "_build/html/{0}.html".format(file_stem)
-        self.output_html_path = Path(dir, html_str).absolute()
+        #html_str = "build/html/{0}.html".format(file_stem)
 
-        # Load the file into the editor
-        self.editor.open_file(self.file_path)
-
+        #self.output_html_path = Path(dir, html_str).absolute()
+        
         # Load the directory containing the file into the tree.
         self.tree.load_from_dir(dir)
-
+        
+        if not self.file_path.endswith('.rst'):
+            try:
+                html_path = os.path.dirname(os.path.relpath(self.tree.get_current_item_path(), dir + '/source'))
+                self.output_html_path = "{0}/build/html/{1}/{2}".format(dir, html_path, filename)
+                print(self.output_html_path)
+                self.preview.load_html(self.output_html_path)
+            except:
+                print(traceback.format_exc())
+            return
+        
+        # Load the file into the editor
+        self.editor.open_file(self.tree.get_current_item_path())
+        try:
+            html_path = os.path.dirname(os.path.relpath(self.tree.get_current_item_path(), dir + '/source'))
+            self.output_html_path = "{0}/build/html/{1}/{2}.html".format(dir, html_path, file_stem)
+        except:
+            pass
+        #print(self.tree.get_current_item_path())
+        
         # Load corresponding HTML file from pre-built Sphinx docs
         self.preview.load_html(self.output_html_path)
 
@@ -251,7 +304,7 @@ class MainWindow(QtGui.QMainWindow):
             stderr=subprocess.STDOUT
         )
         for line in proc.stdout:
-            print("stdout: " + line.rstrip())
+            print("stdout: " + str(line.rstrip(), encoding='utf8'))
         print('----------------')
         proc = subprocess.Popen(
             ["make", "html"],
@@ -261,7 +314,7 @@ class MainWindow(QtGui.QMainWindow):
         )
         proc.wait()
         for line in proc.stdout:
-            print("stdout: " + line.rstrip())
+            print("stdout: " + str(line.rstrip(), encoding='utf8'))
 
         # Load corresponding HTML file from newly-built Sphinx docs
         self.preview.load_html(self.output_html_path)

@@ -1,14 +1,14 @@
-from PySide import QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore
 
 
-class Tree(QtGui.QTreeView):
+class Tree(QtWidgets.QTreeView):
 	def __init__(self, parent=None):
 		super(Tree, self).__init__(parent)
 		self.dir_path = None
 		
 		# TODO: resize tree according to contents.
 		# For now, max width is hardcoded.
-		self.setMaximumWidth(180)
+		self.setMaximumWidth(400)
 
 	def load_from_dir(self, dir_path):
 		""" Load directory containing file into the tree. """
@@ -21,7 +21,7 @@ class Tree(QtGui.QTreeView):
 		self.dir_path = dir_path
 		
 		# Link the tree to a model
-		model = QtGui.QFileSystemModel()
+		model = QtWidgets.QFileSystemModel()
 		model.setRootPath(dir_path)
 		self.setModel(model)
 		
@@ -31,6 +31,9 @@ class Tree(QtGui.QTreeView):
 
 		# Display tree cleanly
 		self.hide_unwanted_info()
+    
+	def get_current_item_path(self) -> str:
+		return (self.model().filePath(self.currentIndex()))
 		
 	def hide_unwanted_info(self):
 		""" Hides unneeded columns and header. """		

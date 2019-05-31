@@ -1,7 +1,7 @@
-from PySide import QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore
 
 
-class OpenDialog(QtGui.QFileDialog):
+class OpenDialog(QtWidgets.QFileDialog):
 	def __init__(self, parent=None):
 		super(OpenDialog, self).__init__()
 
